@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow | Personal Budget Tracker</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config for Custom Colors/Fonts -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        },
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            text: '#f8fafc'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Glassmorphism Utilities */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.4s ease-out forwards;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-dark-bg dark:text-slate-100 transition-colors duration-300 min-h-screen font-sans selection:bg-primary-500 selection:text-white">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass border-b border-slate-200 dark:border-slate-700 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
+                        <i class="fa-solid fa-wallet text-lg"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight">Flow<span class="text-primary-600 dark:text-primary-500">Budget</span></span>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <!-- View Toggle -->
+                    <div class="hidden md:flex bg-slate-200 dark:bg-slate-700 rounded-lg p-1">
+                        <button onclick="app.setView('monthly')" id="btn-monthly" class="px-4 py-1.5 rounded-md text-sm font-medium transition-all bg-white dark:bg-slate-600 shadow-sm">Monthly</button>
+                        <button onclick="app.setView('yearly')" id="btn-yearly" class="px-4 py-1.5 rounded-md text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Yearly</button>
+                    </div>
+
+                    <!-- Theme Toggle -->
+                    <button onclick="app.toggleTheme()" class="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-300">
+                        <i class="fa-solid fa-moon dark:hidden"></i>
+                        <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Income Card -->
+            <div class="glass rounded-2xl p-6 shadow-sm border-l-4 border-emerald-500 animate-slide-in" style="animation-delay: 0ms;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Income</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1" id="total-income">$0.00</h3>
+                    </div>
+                    <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+                        <i class="fa-solid fa-arrow-trend-up"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expense Card -->
+            <div class="glass rounded-2xl p-6 shadow-sm border-l-4 border-rose-500 animate-slide-in" style="animation-delay: 100ms;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Expenses</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1" id="total-expense">$0.00</h3>
+                    </div>
+                    <div class="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg text-rose-600 dark:text-rose-400">
+                        <i class="fa-solid fa-arrow-trend-down"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balance Card -->
+            <div class="glass rounded-2xl p-6 shadow-sm border-l-4 border-primary-500 animate-slide-in" style="animation-delay: 200ms;">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Net Balance</p>
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white mt-1" id="net-balance">$0.00</h3>
+                    </div>
+                    <div class="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg text-primary-600 dark:text-primary-400">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                    </div>
+                </div>
+                <div class="mt-4 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                    <div id="savings-bar" class="bg-primary-500 h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2 text-right" id="savings-rate">0% Saved</p>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Pie Chart: Expense Breakdown -->
+            <div class="glass rounded-2xl p-6 shadow-sm lg:col-span-1 animate-slide-in" style="animation-delay: 300ms;">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-purple-500"></i> Expenses by Category
+                </h3>
+                <div class="chart-container">
+                    <canvas id="expensePieChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Bar Chart: Income vs Expense -->
+            <div class="glass rounded-2xl p-6 shadow-sm lg:col-span-2 animate-slide-in" style="animation-delay: 400ms;">
+                <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-blue-500"></i> Cash Flow Overview
+                </h3>
+                <div class="chart-container">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Chart: Trends -->
+        <div class="glass rounded-2xl p-6 shadow-sm mb-8 animate-slide-in" style="animation-delay: 500ms;">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-emerald-500"></i> Spending Trends
+            </h3>
+            <div class="chart-container" style="height: 250px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Transaction Management -->
+        <div class="glass rounded-2xl shadow-sm overflow-hidden animate-slide-in" style="animation-delay: 600ms;">
+            <div class="p-6 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h3 class="text-lg font-semibold">Recent Transactions</h3>
+                <button onclick="app.openModal()" class="w-full sm:w-auto px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Add Transaction
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs uppercase font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">Date</th>
+                            <th class="px-6 py-4">Description</th>
+                            <th class="px-6 py-4">Category</th>
+                            <th class="px-6 py-4 text-right">Amount</th>
+                            <th class="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-list" class="divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+                        <!-- Rows generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden p-12 text-center">
+                <div class="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400 text-2xl">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400">No transactions found for this period.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="fixed inset-0 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity opacity-0" id="modal-backdrop"></div>
+
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+            <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                <!-- Modal Panel -->
+                <div class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-dark-card text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" id="modal-panel">
+                    
+                    <div class="bg-white dark:bg-dark-card px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                <i class="fa-solid fa-pen text-primary-600 dark:text-primary-400"></i>
+                            </div>
+                            <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                                <h3 class="text-lg font-semibold leading-6 text-slate-900 dark:text-white" id="modal-title">Add Transaction</h3>
+                                <div class="mt-4 space-y-4">
+                                    
+                                    <!-- Type Selection -->
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="type" value="income" class="peer sr-only" onchange="app.updateCategoryOptions()">
+                                            <div class="rounded-lg border-2 border-slate-200 dark:border-slate-600 p-2 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-50 dark:peer-checked:bg-emerald-900/20 peer-checked:text-emerald-700 dark:peer-checked:text-emerald-400 transition-all">
+                                                <i class="fa-solid fa-arrow-down mb-1"></i><br>Income
+                                            </div>
+                                        </label>
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="type" value="expense" class="peer sr-only" checked onchange="app.updateCategoryOptions()">
+                                            <div class="rounded-lg border-2 border-slate-200 dark:border-slate-600 p-2 text-center peer-checked:border-rose-500 peer-checked:bg-rose-50 dark:peer-checked:bg-rose-900/20 peer-checked:text-rose-700 dark:peer-checked:text-rose-400 transition-all">
+                                                <i class="fa-solid fa-arrow-up mb-1"></i><br>Expense
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <!-- Amount & Date -->
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Amount ($)</label>
+                                            <input type="number" id="input-amount" step="0.01" class="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="0.00">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Date</label>
+                                            <input type="date" id="input-date" class="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all">
+                                        </div>
+                                    </div>
+
+                                    <!-- Category -->
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Category</label>
+                                        <select id="input-category" class="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all">
+                                            <!-- Populated by JS -->
+                                        </select>
+                                    </div>
+
+                                    <!-- Description -->
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Description</label>
+                                        <input type="text" id="input-desc" class="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="e.g. Grocery Shopping">
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <button type="button" onclick="app.saveTransaction()" class="inline-flex w-full justify-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 sm:ml-3 sm:w-auto transition-colors">Save</button>
+                        <button type="button" onclick="app.closeModal()" class="mt-3 inline-flex w-full justify-center rounded-lg bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-slate-200 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 sm:mt-0 sm:w-auto transition-colors">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        /**
+         * FlowBudget Application Logic
+         * Handles data management, UI updates, and Chart rendering.
+         */
+        const app = (() => {
+            // --- Configuration & State ---
+            const state = {
+                transactions: [],
+                viewMode: 'monthly', // 'monthly' or 'yearly'
+                currentDate: new Date(),
+                editingId: null,
+                charts: {}
+            };
+
+            // Category Definitions
+            const categories = {
+                income: [
+                    { id: 'salary', name: 'Salary', icon: 'fa-briefcase', color: '#10b981' },
+                    { id: 'freelance', name: 'Freelance', icon: 'fa-laptop-code', color: '#3b82f6' },
+                    { id: 'investment', name: 'Investment', icon: 'fa-chart-line', color: '#8b5cf6' },
+                    { id: 'gift', name: 'Gifts', icon: 'fa-gift', color: '#f59e0b' },
+                    { id: 'other_income', name: 'Other', icon: 'fa-circle-plus', color: '#64748b' }
+                ],
+                expense: [
+                    { id: 'rent', name: 'Rent / Housing', icon: 'fa-house', color: '#ef4444' },
+                    { id: 'food', name: 'Food & Dining', icon: 'fa-utensils', color: '#f97316' },
+                    { id: 'transport', name: 'Transport', icon: 'fa-car', color: '#eab308' },
+                    { id: 'utilities', name: 'Utilities', icon: 'fa-bolt', color: '#06b6d4' },
+                    { id: 'entertainment', name: 'Entertainment', icon: 'fa-film', color: '#ec4899' },
+                    { id: 'savings', name: 'Savings', icon: 'fa-piggy-bank', color: '#10b981' },
+                    { id: 'health', name: 'Health', icon: 'fa-heart-pulse', color: '#84cc16' },
+                    { id: 'shopping', name: 'Shopping', icon: 'fa-bag-shopping', color: '#d946ef' },
+                    { id: 'other', name: 'Other', icon: 'fa-circle-minus', color: '#64748b' }
+                ]
+            };
+
+            // --- Initialization ---
+            function init() {
+                loadData();
+                setupEventListeners();
+                updateCategoryOptions();
+                render();
+                
+                // Set today's date in modal
+                document.getElementById('input-date').valueAsDate = new Date();
+            }
+
+            // --- Data Persistence (localStorage) ---
+            function loadData() {
+                const stored = localStorage.getItem('flow_budget_data');
+                if (stored) {
+                    state.transactions = JSON.parse(stored);
+                } else {
+                    // Seed with dummy data if empty
+                    seedDummyData();
+                }
+            }
+
+            function saveData() {
+                localStorage.setItem('flow_budget_data', JSON.stringify(state.transactions));
+            }
+
+            function seedDummyData() {
+                const today = new Date();
+                state.transactions = [
+                    { id: Date.now() - 10000, type: 'income', amount: 5000, category: 'salary', date: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0], desc: 'Monthly Salary' },
+                    { id: Date.now() - 9000, type: 'expense', amount: 1200, category: 'rent', date: new Date(today.getFullYear(), today.getMonth(), 2).toISOString().split('T')[0], desc: 'Apartment Rent' },
+                    { id: Date.now() - 8000, type: 'expense', amount: 150, category: 'utilities', date: new Date(today.getFullYear(), today.getMonth(), 5).toISOString().split('T')[0], desc: 'Electric Bill' },
+                    { id: Date.now() - 7000, type: 'expense', amount: 300, category: 'food', date: new Date(today.getFullYear(), today.getMonth(), 6).toISOString().split('T')[0], desc: 'Weekly Groceries' },
+                    { id: Date.now() - 6000, type: 'expense', amount: 60, category: 'transport', date: new Date(today.getFullYear(), today.getMonth(), 8).toISOString().split('T')[0], desc: 'Gas' },
+                    { id: Date.now() - 5000, type: 'expense', amount: 120, category: 'entertainment', date: new Date(today.getFullYear(), today.getMonth(), 10).toISOString().split('T')[0], desc: 'Concert Tickets' },
+                    { id: Date.now() - 4000, type: 'income', amount: 350, category: 'freelance', date: new Date(today.getFullYear(), today.getMonth(), 12).toISOString().split('T')[0], desc: 'Logo Design Project' },
+                    { id: Date.now() - 3000, type: 'expense', amount: 200, category: 'savings', date: new Date(today.getFullYear(), today.getMonth(), 15).toISOString().split('T')[0], desc: 'Emergency Fund' },
+                ];
+                saveData();
+            }
+
+            // --- Core Logic ---
+            
+            // Filter transactions based on current view (Month or Year)
+            function getFilteredTransactions() {
+                return state.transactions.filter(t => {
+                    const tDate = new Date(t.date);
+                    if (state.viewMode === 'monthly') {
+                        return tDate.getMonth() === state.currentDate.getMonth() && 
+                               tDate.getFullYear() === state.currentDate.getFullYear();
+                    } else {
+                        return tDate.getFullYear() === state.currentDate.getFullYear();
+                    }
+                }).sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+            }
+
+            function calculateStats(transactions) {
+                const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                const balance = income - expense;
+                const savingsRate = income > 0 ? ((income - expense) / income) * 100 : 0;
+                return { income, expense, balance, savingsRate };
+            }
+
+            // --- UI Rendering ---
+
+            function render() {
+                const filtered = getFilteredTransactions();
+                const stats = calculateStats(filtered);
+
+                // Update Summary Cards
+                document.getElementById('total-income').textContent = formatCurrency(stats.income);
+                document.getElementById('total-expense').textContent = formatCurrency(stats.expense);
+                document.getElementById('net-balance').textContent = formatCurrency(stats.balance);
+                
+                // Update Savings Bar
+                const savingsBar = document.getElementById('savings-bar');
+                const savingsText = document.getElementById('savings-rate');
+                const rate = Math.max(0, Math.min(100, stats.savingsRate)); // Clamp 0-100
+                
+                savingsBar.style.width = `${rate}%`;
+                savingsBar.className = `h-1.5 rounded-full transition-all duration-1000 ${stats.balance >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`;
+                savingsText.textContent = `${rate.toFixed(1)}% Saved`;
+
+                // Render Lists & Charts
+                renderTransactionList(filtered);
+                renderCharts(filtered);
+                updateViewToggleUI();
+            }
+
+            function renderTransactionList(transactions) {
+                const tbody = document.getElementById('transaction-list');
+                const emptyState = document.getElementById('empty-state');
+                
+                tbody.innerHTML = '';
+
+                if (transactions.length === 0) {
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                emptyState.classList.add('hidden');
+
+                transactions.forEach(t => {
+                    const catData = getCategoryData(t.category, t.type);
+                    const isIncome = t.type === 'income';
+                    const amountClass = isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400';
+                    const sign = isIncome ? '+' : '-';
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-slate-500 dark:text-slate-400">${formatDate(t.date)}</td>
+                        <td class="px-6 py-4 font-medium text-slate-900 dark:text-white">${t.desc}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                <i class="fa-solid ${catData.icon}" style="color: ${catData.color}"></i>
+                                ${catData.name}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right font-bold ${amountClass}">
+                            ${sign}${formatCurrency(t.amount)}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="app.editTransaction(${t.id})" class="p-1.5 text-slate-400 hover:text-primary-600 transition-colors" title="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="app.deleteTransaction(${t.id})" class="p-1.5 text-slate-400 hover:text-rose-600 transition-colors" title="Delete">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            function renderCharts(transactions) {
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#94a3b8' : '#475569';
+                const gridColor = isDark ? '#334155' : '#e2e8f0';
+
+                // 1. Expense Breakdown (Pie Chart)
+                const expenseTrans = transactions.filter(t => t.type === 'expense');
+                const categoryTotals = {};
+                
+                expenseTrans.forEach(t => {
+                    categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+                });
+
+                const pieLabels = Object.keys(categoryTotals).map(cat => getCategoryData(cat, 'expense').name);
+                const pieData = Object.values(categoryTotals);
+                const pieColors = Object.keys(categoryTotals).map(cat => getCategoryData(cat, 'expense').color);
+
+                const ctxPie = document.getElementById('expensePieChart').getContext('2d');
+                if (state.charts.pie) state.charts.pie.destroy();
+                
+                state.charts.pie = new Chart(ctxPie, {
+                    type: 'doughnut',
+                    data: {
+                        labels: pieLabels,
+                        datasets: [{
+                            data: pieData,
+                            backgroundColor: pieColors,
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { color: textColor, usePointStyle: true, padding: 20 } }
+                        },
+                        cutout: '70%'
+                    }
+                });
+
+                // 2. Monthly/Yearly Bar Chart (Income vs Expense)
+                // Group by Month if Yearly view, or by Week if Monthly view
+                const labels = [];
+                const incomeData = [];
+                const expenseData = [];
+
+                if (state.viewMode === 'yearly') {
+                    // Initialize 12 months
+                    for (let i = 0; i < 12; i++) {
+                        labels.push(new Date(state.currentDate.getFullYear(), i, 1).toLocaleString('default', { month: 'short' }));
+                        incomeData.push(0);
+                        expenseData.push(0);
+                    }
+                    transactions.forEach(t => {
+                        const month = new Date(t.date).getMonth();
+                        if (t.type === 'income') incomeData[month] += t.amount;
+                        else expenseData[month] += t.amount;
+                    });
+                } else {
+                    // Monthly view: Show by Week or Day? Let's do Day for simplicity in monthly view
+                    // Actually, let's just show Total Income vs Total Expense for the month as two bars
+                    // Or better, compare to previous months? No, let's stick to simple: 
+                    // Two bars: Income vs Expense for the selected period.
+                    // Or stack categories? 
+                    // Let's do: Comparison of Income vs Expense (Simple 2 bars) + Savings Rate bar?
+                    // Let's do: Daily spending trend for the bar chart in monthly view.
+                    
+                    const daysInMonth = new Date(state.currentDate.getFullYear(), state.currentDate.getMonth() + 1, 0).getDate();
+                    for(let i=1; i<=daysInMonth; i+=2) { // Every 2 days to save space
+                        labels.push(i);
+                        incomeData.push(0);
+                        expenseData.push(0);
+                    }
+                    transactions.forEach(t => {
+                        const day = new Date(t.date).getDate();
+                        const index = Math.floor((day-1)/2);
+                        if(index >= 0 && index < incomeData.length) {
+                            if (t.type === 'income') incomeData[index] += t.amount;
+                            else expenseData[index] += t.amount;
+                        }
+                    });
+                }
+
+                const ctxBar = document.getElementById('barChart').getContext('2d');
+                if (state.charts.bar) state.charts.bar.destroy();
+
+                state.charts.bar = new Chart(ctxBar, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Income',
+                                data: incomeData,
+                                backgroundColor: '#10b981',
+                                borderRadius: 4,
+                            },
+                            {
+                                label: 'Expense',
+                                data: expenseData,
+                                backgroundColor: '#f43f5e',
+                                borderRadius: 4,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+                            x: { grid: { display: false }, ticks: { color: textColor } }
+                        },
+                        plugins: {
+                            legend: { labels: { color: textColor } }
+                        }
+                    }
+                });
+
+                // 3. Trend Line Chart (Net Balance over time)
+                // Sort transactions by date ascending for line chart
+                const sortedTrans = [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+                let runningBalance = 0;
+                // We need a starting balance? For simplicity, we assume chart starts at 0 or we calculate cumulative
+                // Let's just show daily net change cumulative
+                
+                const trendLabels = [];
+                const trendData = [];
+                
+                // Group by date
+                const dailyNet = {};
+                sortedTrans.forEach(t => {
+                    if(!dailyNet[t.date]) dailyNet[t.date] = 0;
+                    dailyNet[t.date] += (t.type === 'income' ? t.amount : -t.amount);
+                });
+                
+                let cumSum = 0;
+                Object.keys(dailyNet).sort().forEach(date => {
+                    cumSum += dailyNet[date];
+                    trendLabels.push(formatDateShort(date));
+                    trendData.push(cumSum);
+                });
+
+                const ctxTrend = document.getElementById('trendChart').getContext('2d');
+                if (state.charts.trend) state.charts.trend.destroy();
+
+                // Create gradient
+                const gradient = ctxTrend.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
+                gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+                state.charts.trend = new Chart(ctxTrend, {
+                    type: 'line',
+                    data: {
+                        labels: trendLabels,
+                        datasets: [{
+                            label: 'Net Balance',
+                            data: trendData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: gradient,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { grid: { color: gridColor }, ticks: { color: textColor } },
+                            x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 8 } }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index',
+                        },
+                    }
+                });
+            }
+
+            // --- Helper Functions ---
+
+            function getCategoryData(id, type) {
+                const list = categories[type] || categories['expense'];
+                return list.find(c => c.id === id) || { name: 'Unknown', icon: 'fa-question', color: '#ccc' };
+            }
+
+            function formatCurrency(num) {
+                return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+            }
+
+            function formatDate(dateStr) {
+                const options = { month: 'short', day: 'numeric' };
+                return new Date(dateStr).toLocaleDateString('en-US', options);
+            }
+            
+            function formatDateShort(dateStr) {
+                const d = new Date(dateStr);
+                return `${d.getMonth()+1}/${d.getDate()}`;
+            }
+
+            // --- User Actions ---
+
+            function setView(mode) {
+                state.viewMode = mode;
+                render();
+            }
+
+            function updateViewToggleUI() {
+                const btnMonthly = document.getElementById('btn-monthly');
+                const btnYearly = document.getElementById('btn-yearly');
+                
+                const activeClass = "bg-white dark:bg-slate-600 shadow-sm text-slate-900 dark:text-white";
+                const inactiveClass = "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white";
+
+                if (state.viewMode === 'monthly') {
+                    btnMonthly.className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeClass}`;
+                    btnYearly.className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all ${inactiveClass}`;
+                } else {
+                    btnMonthly.className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all ${inactiveClass}`;
+                    btnYearly.className = `px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeClass}`;
+                }
+            }
+
+            function toggleTheme() {
+                const html = document.documentElement;
+                if (html.classList.contains('dark')) {
+                    html.classList.remove('dark');
+                    html.classList.add('light');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    html.classList.remove('light');
+                    html.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                }
+                render(); // Re-render charts to update colors
+            }
+
+            // --- Modal & Form Handling ---
+
+            function openModal(id = null) {
+                const modal = document.getElementById('modal');
+                const backdrop = document.getElementById('modal-backdrop');
+                const panel = document.getElementById('modal-panel');
+                const title = document.getElementById('modal-title');
+
+                // Reset form
+                document.getElementById('input-amount').value = '';
+                document.getElementById('input-desc').value = '';
+                document.getElementById('input-date').valueAsDate = new Date();
+                document.querySelector('input[name="type"][value="expense"]').checked = true;
+                updateCategoryOptions();
+
+                if (id) {
+                    // Edit Mode
+                    const t = state.transactions.find(x => x.id === id);
+                    if (t) {
+                        state.editingId = id;
+                        title.textContent = 'Edit Transaction';
+                        document.getElementById('input-amount').value = t.amount;
+                        document.getElementById('input-desc').value = t.desc;
+                        document.getElementById('input-date').value = t.date;
+                        document.querySelector(`input[name="type"][value="${t.type}"]`).checked = true;
+                        updateCategoryOptions();
+                        document.getElementById('input-category').value = t.category;
+                    }
+                } else {
+                    state.editingId = null;
+                    title.textContent = 'Add Transaction';
+                }
+
+                modal.classList.remove('hidden');
+                // Small delay for animation
+                setTimeout(() => {
+                    backdrop.classList.remove('opacity-0');
+                    panel.classList.remove('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+                    panel.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+                }, 10);
+            }
+
+            function closeModal() {
+                const modal = document.getElementById('modal');
+                const backdrop = document.getElementById('modal-backdrop');
+                const panel = document.getElementById('modal-panel');
+
+                backdrop.classList.add('opacity-0');
+                panel.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+                panel.classList.add('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+
+            function updateCategoryOptions() {
+                const type = document.querySelector('input[name="type"]:checked').value;
+                const select = document.getElementById('input-category');
+                select.innerHTML = '';
+                
+                categories[type].forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            }
+
+            function saveTransaction() {
+                const amount = parseFloat(document.getElementById('input-amount').value);
+                const date = document.getElementById('input-date').value;
+                const category = document.getElementById('input-category').value;
+                const desc = document.getElementById('input-desc').value;
+                const type = document.querySelector('input[name="type"]:checked').value;
+
+                if (!amount || !date || !desc) {
+                    alert("Please fill in all fields");
+                    return;
+                }
+
+                const newTrans = {
+                    id: state.editingId || Date.now(),
+                    type,
+                    amount,
+                    date,
+                    category,
+                    desc
+                };
+
+                if (state.editingId) {
+                    const index = state.transactions.findIndex(t => t.id === state.editingId);
+                    if (index !== -1) state.transactions[index] = newTrans;
+                } else {
+                    state.transactions.push(newTrans);
+                }
+
+                saveData();
+                closeModal();
+                render();
+            }
+
+            function deleteTransaction(id) {
+                if(confirm('Are you sure you want to delete this transaction?')) {
+                    state.transactions = state.transactions.filter(t => t.id !== id);
+                    saveData();
+                    render();
+                }
+            }
+            
+            function editTransaction(id) {
+                openModal(id);
+            }
+
+            function setupEventListeners() {
+                // Close modal on backdrop click
+                document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+                
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') closeModal();
+                });
+            }
+
+            // Check system theme preference on load
+            if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+
+            // Expose public methods
+            return {
+                init,
+                setView,
+                toggleTheme,
+                openModal,
+                closeModal,
+                saveTransaction,
+                deleteTransaction,
+                editTransaction,
+                updateCategoryOptions
+            };
+        })();
+
+        // Start App
+        document.addEventListener('DOMContentLoaded', app.init);
+    </script>
+</body>
+</html>
